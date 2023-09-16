@@ -1,5 +1,6 @@
 use yew::prelude::*;
 mod canvas;
+mod mandelbrot;
 mod space;
 use space::Space;
 

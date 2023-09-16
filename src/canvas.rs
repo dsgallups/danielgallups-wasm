@@ -1,14 +1,27 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 use wasm_bindgen::JsCast;
-use web_sys::{HtmlCanvasElement, WebGlRenderingContext as GL};
+use web_sys::{CanvasRenderingContext2d, HtmlCanvasElement, WebGlRenderingContext as GL};
 use yew::{html, Component, Context, Html, NodeRef};
 
+use gloo_console::log;
 use wasm_bindgen::prelude::*;
 use web_sys::{window, WebGlRenderingContext};
 
+use crate::mandelbrot::{Mandelbrot, MandelbrotBuilder, ShadingType};
+
+enum Msg {
+    Zoom,
+    ScrollX,
+    ScrollY,
+    Drag,
+}
+
 pub struct Canvas {
     node_ref: NodeRef,
+    width: u32,
+    height: u32,
+    mandelbrot: Mandelbrot,
 }
 
 impl Component for Canvas {
@@ -16,18 +29,35 @@ impl Component for Canvas {
     type Properties = ();
 
     fn create(_ctx: &Context<Self>) -> Self {
+        let mandelbrot = MandelbrotBuilder::new()
+            .height(300)
+            .width(300)
+            .max_iterations(12)
+            .shading_type(ShadingType::OpacityAndColor)
+            .opacity(255)
+            .zoom(1.0)
+            .x_offset(0.0)
+            .y_offset(0.0)
+            .build();
         Self {
             node_ref: NodeRef::default(),
+            width: 300,
+            height: 300,
+            mandelbrot,
         }
     }
 
     fn view(&self, _ctx: &Context<Self>) -> Html {
+        log!("test");
         html! {
-            <canvas ref={self.node_ref.clone()}></canvas>
+            <canvas ref={self.node_ref.clone()} width={300} height={300} ></canvas>
         }
     }
 
     fn rendered(&mut self, _ctx: &Context<Self>, first_render: bool) {
+        //TODO: This is where we get and then set the viewport height and width for the canvas.
+
+        log!("in rendered");
         // Only start the render loop if it's the first render
         // There's no loop cancellation taking place, so if multiple renders happen,
         // there would be multiple loops running. That doesn't *really* matter here because
@@ -40,85 +70,22 @@ impl Component for Canvas {
         // resizing the rendering area when the window or canvas element are resized, as well as
         // for making GL calls.
         let canvas = self.node_ref.cast::<HtmlCanvasElement>().unwrap();
-        let gl: GL = canvas
-            .get_context("webgl")
+        let gl: CanvasRenderingContext2d = canvas
+            .get_context("2d")
             .unwrap()
             .unwrap()
             .dyn_into()
             .unwrap();
-        Self::render_gl(gl);
+
+        //Generate mandelbrot here
+        //let res = self.mandelbrot.draw();
+
+        //let img = web_sys::ImageData::new_with_u8_clamped_array_and_sh(data, sw, sh);
+
+        Self::render_canvas(gl);
     }
 }
 
 impl Canvas {
-    fn request_animation_frame(f: &Closure<dyn FnMut()>) {
-        window()
-            .unwrap()
-            .request_animation_frame(f.as_ref().unchecked_ref())
-            .expect("should register `requestAnimationFrame` OK");
-    }
-
-    fn render_gl(gl: WebGlRenderingContext) {
-        // This should log only once -- not once per frame
-
-        let mut timestamp = 0.0;
-
-        let vert_code = include_str!("./basic.vert");
-        let frag_code = include_str!("./basic.frag");
-
-        // This list of vertices will draw two triangles to cover the entire canvas.
-        let vertices: Vec<f32> = vec![
-            -1.0, -1.0, 1.0, -1.0, -1.0, 1.0, -1.0, 1.0, 1.0, -1.0, 1.0, 1.0,
-        ];
-        let vertex_buffer = gl.create_buffer().unwrap();
-        let verts = js_sys::Float32Array::from(vertices.as_slice());
-
-        gl.bind_buffer(GL::ARRAY_BUFFER, Some(&vertex_buffer));
-        gl.buffer_data_with_array_buffer_view(GL::ARRAY_BUFFER, &verts, GL::STATIC_DRAW);
-
-        let vert_shader = gl.create_shader(GL::VERTEX_SHADER).unwrap();
-        gl.shader_source(&vert_shader, vert_code);
-        gl.compile_shader(&vert_shader);
-
-        let frag_shader = gl.create_shader(GL::FRAGMENT_SHADER).unwrap();
-        gl.shader_source(&frag_shader, frag_code);
-        gl.compile_shader(&frag_shader);
-
-        let shader_program = gl.create_program().unwrap();
-        gl.attach_shader(&shader_program, &vert_shader);
-        gl.attach_shader(&shader_program, &frag_shader);
-        gl.link_program(&shader_program);
-
-        gl.use_program(Some(&shader_program));
-
-        // Attach the position vector as an attribute for the GL context.
-        let position = gl.get_attrib_location(&shader_program, "a_position") as u32;
-        gl.vertex_attrib_pointer_with_i32(position, 2, GL::FLOAT, false, 0, 0);
-        gl.enable_vertex_attrib_array(position);
-
-        // Attach the time as a uniform for the GL context.
-        let time = gl.get_uniform_location(&shader_program, "u_time");
-        gl.uniform1f(time.as_ref(), timestamp as f32);
-
-        gl.draw_arrays(GL::TRIANGLES, 0, 6);
-
-        // Gloo-render's request_animation_frame has this extra closure
-        // wrapping logic running every frame, unnecessary cost.
-        // Here constructing the wrapped closure just once.
-
-        let cb = Rc::new(RefCell::new(None));
-
-        *cb.borrow_mut() = Some(Closure::wrap(Box::new({
-            let cb = cb.clone();
-            move || {
-                // This should repeat every frame
-                timestamp += 20.0;
-                gl.uniform1f(time.as_ref(), timestamp as f32);
-                gl.draw_arrays(GL::TRIANGLES, 0, 6);
-                Canvas::request_animation_frame(cb.borrow().as_ref().unwrap());
-            }
-        }) as Box<dyn FnMut()>));
-
-        Canvas::request_animation_frame(cb.borrow().as_ref().unwrap());
-    }
+    fn render_canvas(gl: CanvasRenderingContext2d) {}
 }
