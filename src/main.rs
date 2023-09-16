@@ -19,6 +19,7 @@ fn App() -> Html {
             <button {onclick}>{ "+1" }</button>
             <p>{ *counter }</p>
             <div>{"This is a test"}</div>
+            <canvas::Canvas/>
         </div>
     }
 }
