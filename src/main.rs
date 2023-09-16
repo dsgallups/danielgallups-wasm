@@ -1,4 +1,7 @@
 use yew::prelude::*;
+mod canvas;
+mod space;
+use space::Space;
 
 #[function_component]
 fn App() -> Html {
@@ -15,6 +18,7 @@ fn App() -> Html {
         <div>
             <button {onclick}>{ "+1" }</button>
             <p>{ *counter }</p>
+            <div>{"This is a test"}</div>
         </div>
     }
 }
